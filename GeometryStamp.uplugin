@@ -1,0 +1,38 @@
+{
+  "FileVersion": 3,
+  "Version": 1,
+  "VersionName": "0.1.0",
+  "FriendlyName": "Geometry Stamp",
+  "Description": "Editor tool for projecting heightmap-displaced geometry stamps onto Unreal Engine surfaces.",
+  "Category": "Level Design",
+  "CreatedBy": "Dead Sue",
+  "CanContainContent": true,
+  "IsBetaVersion": true,
+  "Installed": false,
+  "Modules": [
+    {
+      "Name": "GeometryStamp",
+      "Type": "Editor",
+      "LoadingPhase": "Default"
+    }
+  ],
+  "Plugins": [
+    {
+      "Name": "GeometryScripting",
+      "Enabled": true
+    },
+    {
+      "Name": "PCG",
+      "Enabled": true
+    },
+    {
+      "Name": "PCGGeometryScriptInterop",
+      "Enabled": true
+    },
+    {
+      "Name": "ModelingToolsEditorMode",
+      "Enabled": true
+    }
+  ]
+}
+
