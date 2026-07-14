@@ -7,6 +7,8 @@
 - [x] Height texture sampling
 - [x] Circle and rectangle masks
 - [x] Live editor rebuilding
+- [x] Lightweight move preview and full-quality release rebuild
+- [x] Details Panel category prioritization
 - [ ] Compile and smoke-test in Unreal Engine 5.6.1
 
 ## 0.2 — Bakeable MVP
@@ -34,4 +36,3 @@
 - [ ] Runtime Virtual Texture blending
 - [ ] Multi-direction projection and slope filtering
 - [ ] HLOD integration
-

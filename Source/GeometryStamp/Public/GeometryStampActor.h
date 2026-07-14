@@ -42,7 +42,12 @@ enum class EGeometryStampHeightChannel : uint8
  * The generated mesh is never intended to ship directly; a later milestone
  * converts the preview to a Nanite-ready Static Mesh asset.
  */
-UCLASS(BlueprintType, Blueprintable, HideCategories = (Replication, Networking, Input))
+UCLASS(
+    BlueprintType,
+    Blueprintable,
+    ClassGroup = (GeometryStamp),
+    AutoExpandCategories = ("Geometry Stamp"),
+    HideCategories = (Replication, Networking, Input))
 class GEOMETRYSTAMP_API AGeometryStampActor : public AActor
 {
     GENERATED_BODY()
@@ -54,6 +59,7 @@ public:
 
 #if WITH_EDITOR
     virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
+    virtual void PostEditMove(bool bFinished) override;
 #endif
 
     UFUNCTION(CallInEditor, BlueprintCallable, Category = "Geometry Stamp")
@@ -93,10 +99,28 @@ protected:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Geometry Stamp|Height", meta = (ClampMin = "0.0", ClampMax = "1.0", UIMin = "0.0", UIMax = "1.0"))
     float HeightCenter = 0.5f;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Geometry Stamp|Height", meta = (UIMin = "-1000.0", UIMax = "1000.0", Units = "cm"))
+    UPROPERTY(
+        EditAnywhere,
+        BlueprintReadWrite,
+        Category = "Geometry Stamp|Height",
+        meta = (
+            DisplayName = "Displacement Strength",
+            ToolTip = "Displacement range in centimeters. This is independent of the actor height.",
+            UIMin = "-1000.0",
+            UIMax = "1000.0",
+            Units = "cm"))
     double HeightMagnitude = 100.0;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Geometry Stamp|Height", meta = (UIMin = "-100.0", UIMax = "100.0", Units = "cm"))
+    UPROPERTY(
+        EditAnywhere,
+        BlueprintReadWrite,
+        Category = "Geometry Stamp|Height",
+        meta = (
+            DisplayName = "Surface Offset",
+            ToolTip = "Small normal offset used to prevent z-fighting with the projected surface.",
+            UIMin = "-100.0",
+            UIMax = "100.0",
+            Units = "cm"))
     double HeightAdd = 0.5;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Geometry Stamp|Height", meta = (ClampMin = "0.001", ClampMax = "1.0", UIMin = "0.01", UIMax = "1.0"))
@@ -114,13 +138,47 @@ protected:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Geometry Stamp|Material", meta = (ClampMin = "0.01", UIMin = "1.0", Units = "cm"))
     double UVSize = 100.0;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Geometry Stamp|Editor")
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Geometry Stamp|Preview")
     bool bAutoRebuild = true;
+
+    UPROPERTY(
+        EditAnywhere,
+        BlueprintReadWrite,
+        Category = "Geometry Stamp|Preview",
+        meta = (EditCondition = "bAutoRebuild"))
+    bool bLightweightMovePreview = true;
+
+    UPROPERTY(
+        EditAnywhere,
+        BlueprintReadWrite,
+        Category = "Geometry Stamp|Preview",
+        meta = (
+            ClampMin = "2",
+            ClampMax = "64",
+            UIMin = "4",
+            UIMax = "32",
+            EditCondition = "bAutoRebuild && bLightweightMovePreview"))
+    int32 MovePreviewResolution = 16;
+
+    UPROPERTY(
+        EditAnywhere,
+        BlueprintReadWrite,
+        Category = "Geometry Stamp|Preview",
+        meta = (
+            ClampMin = "0.0",
+            ClampMax = "1.0",
+            UIMin = "0.0",
+            UIMax = "0.25",
+            Units = "s",
+            EditCondition = "bAutoRebuild && bLightweightMovePreview"))
+    double MovePreviewUpdateInterval = 0.05;
 
 private:
     bool bIsRebuilding = false;
+    double LastMovePreviewTime = -1.0;
 
-    void BuildProjectedMesh(UE::Geometry::FDynamicMesh3& Mesh);
+    void RebuildStampInternal(int32 Resolution);
+    void BuildProjectedMesh(UE::Geometry::FDynamicMesh3& Mesh, int32 Resolution);
     float CalculateShapeDistance(const FVector2D& NormalizedPosition) const;
     float CalculateEdgeMask(float ShapeDistance) const;
 };

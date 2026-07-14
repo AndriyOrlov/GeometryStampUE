@@ -1,5 +1,6 @@
 #include "GeometryStampActor.h"
 
+#include "HAL/PlatformTime.h"
 #include "Components/DynamicMeshComponent.h"
 #include "DynamicMesh/DynamicMesh3.h"
 #include "DynamicMesh/MeshNormals.h"
@@ -98,6 +99,11 @@ AGeometryStampActor::AGeometryStampActor()
     PrimaryActorTick.bCanEverTick = false;
     bIsEditorOnlyActor = true;
 
+#if WITH_EDITORONLY_DATA
+    // PostEditMove provides a deliberately low-resolution drag preview instead.
+    bRunConstructionScriptOnDrag = false;
+#endif
+
     PreviewMesh = CreateDefaultSubobject<UDynamicMeshComponent>(TEXT("PreviewMesh"));
     SetRootComponent(PreviewMesh);
 
@@ -126,9 +132,44 @@ void AGeometryStampActor::PostEditChangeProperty(FPropertyChangedEvent& Property
         RebuildStamp();
     }
 }
+
+void AGeometryStampActor::PostEditMove(bool bFinished)
+{
+    Super::PostEditMove(bFinished);
+
+    if (!bAutoRebuild || bIsRebuilding)
+    {
+        return;
+    }
+
+    if (bFinished)
+    {
+        RebuildStamp();
+        return;
+    }
+
+    if (!bLightweightMovePreview)
+    {
+        return;
+    }
+
+    const double CurrentTime = FPlatformTime::Seconds();
+    if (LastMovePreviewTime >= 0.0 && CurrentTime - LastMovePreviewTime < MovePreviewUpdateInterval)
+    {
+        return;
+    }
+
+    LastMovePreviewTime = CurrentTime;
+    RebuildStampInternal(MovePreviewResolution);
+}
 #endif
 
 void AGeometryStampActor::RebuildStamp()
+{
+    RebuildStampInternal(GridResolution);
+}
+
+void AGeometryStampActor::RebuildStampInternal(int32 Resolution)
 {
     if (bIsRebuilding || !PreviewMesh || !GetWorld())
     {
@@ -138,7 +179,7 @@ void AGeometryStampActor::RebuildStamp()
     TGuardValue<bool> RebuildGuard(bIsRebuilding, true);
 
     FDynamicMesh3 GeneratedMesh(true, true, true, false);
-    BuildProjectedMesh(GeneratedMesh);
+    BuildProjectedMesh(GeneratedMesh, Resolution);
 
     PreviewMesh->GetDynamicMesh()->SetMesh(MoveTemp(GeneratedMesh));
     PreviewMesh->SetMaterial(0, PreviewMaterial);
@@ -156,9 +197,9 @@ void AGeometryStampActor::ClearStamp()
     PreviewMesh->NotifyMeshUpdated();
 }
 
-void AGeometryStampActor::BuildProjectedMesh(FDynamicMesh3& Mesh)
+void AGeometryStampActor::BuildProjectedMesh(FDynamicMesh3& Mesh, int32 RequestedResolution)
 {
-    const int32 Resolution = FMath::Clamp(GridResolution, 2, 512);
+    const int32 Resolution = FMath::Clamp(RequestedResolution, 2, 512);
     const int32 VerticesPerSide = Resolution + 1;
     const FTransform ActorTransform = GetActorTransform();
     const FVector TraceDirection = Projection == EGeometryStampProjection::ActorDown

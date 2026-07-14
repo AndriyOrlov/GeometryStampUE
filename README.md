@@ -20,6 +20,8 @@ from third-party marketplace products.
 - Height channel, center, magnitude and additive offset controls.
 - Smooth geometric edge falloff.
 - Automatic editor preview rebuild.
+- Lightweight, throttled preview while moving the actor.
+- Full-resolution rebuild after the actor is released.
 - Optional preview material and world-sized UVs.
 
 Static Mesh/Nanite baking, asset presets, batch operations and PCG integration
@@ -43,6 +45,11 @@ Target: Unreal Engine 5.6 and 5.7 on Windows.
 4. Adjust `Height Magnitude`, `Height Center`, `Edge Falloff` and `Mask Hardness`.
 5. Use `Rebuild Stamp` if automatic rebuild is disabled.
 
+`Displacement Strength` is intentionally independent from actor height. Moving
+the actor changes the stamp location and projection direction without changing
+the sculpted result. During movement, `Move Preview Resolution` is used for a
+responsive preview; releasing the actor restores the full `Grid Resolution`.
+
 High resolutions perform one collision trace per vertex. Use low resolution for
 iteration and reserve high resolution for the future bake workflow.
 
@@ -50,4 +57,3 @@ iteration and reserve high resolution for the future bake workflow.
 
 This is an early source prototype and has not yet been compiled against a local
 Unreal Engine installation in the current development environment.
-
