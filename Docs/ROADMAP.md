@@ -9,6 +9,7 @@
 - [x] Live editor rebuilding
 - [x] Lightweight move preview and full-quality release rebuild
 - [x] Details Panel category prioritization
+- [x] Dedicated Place Actors drag-and-drop category
 - [ ] Compile and smoke-test in Unreal Engine 5.6.1
 
 ## 0.2 — Bakeable MVP

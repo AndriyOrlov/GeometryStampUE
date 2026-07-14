@@ -11,4 +11,6 @@ public:
 private:
     void RegisterDetailsCustomization();
     void UnregisterDetailsCustomization();
+    void RegisterPlacementItems();
+    void UnregisterPlacementItems();
 };

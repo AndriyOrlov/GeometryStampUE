@@ -47,6 +47,7 @@ UCLASS(
     Blueprintable,
     ClassGroup = (GeometryStamp),
     AutoExpandCategories = ("Geometry Stamp"),
+    meta = (DisplayName = "Geometry Stamp"),
     HideCategories = (Replication, Networking, Input))
 class GEOMETRYSTAMP_API AGeometryStampActor : public AActor
 {

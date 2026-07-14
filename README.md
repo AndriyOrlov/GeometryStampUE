@@ -23,6 +23,7 @@ from third-party marketplace products.
 - Lightweight, throttled preview while moving the actor.
 - Full-resolution rebuild after the actor is released.
 - Optional preview material and world-sized UVs.
+- Dedicated **Place Actors → Geometry Stamp** drag-and-drop item.
 
 Static Mesh/Nanite baking, asset presets, batch operations and PCG integration
 are planned for later milestones.
@@ -33,7 +34,10 @@ are planned for later milestones.
 2. Open the Unreal project.
 3. Enable **Geometry Stamp** when prompted and rebuild the C++ modules.
 4. Ensure the target Landscape or Static Mesh has Visibility collision enabled.
-5. Place **Geometry Stamp Actor** from the Place Actors panel.
+5. Open **Place Actors → Geometry Stamp** and drag **Geometry Stamp** into the level.
+
+The placed native actor is Blueprint-compatible. You can use it directly or
+create a Blueprint child when project-specific defaults and presets are needed.
 
 Target: Unreal Engine 5.6 and 5.7 on Windows.
 

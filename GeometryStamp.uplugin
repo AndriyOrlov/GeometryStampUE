@@ -1,7 +1,7 @@
 {
   "FileVersion": 3,
-  "Version": 2,
-  "VersionName": "0.2.0",
+  "Version": 3,
+  "VersionName": "0.3.0",
   "FriendlyName": "Geometry Stamp",
   "Description": "Editor tool for projecting heightmap-displaced geometry stamps onto Unreal Engine surfaces.",
   "Category": "Level Design",
