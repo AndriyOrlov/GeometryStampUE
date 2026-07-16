@@ -123,6 +123,18 @@ bool IsSurfaceAngleAllowed(const FVector& TraceDirection, const FVector& ImpactN
     return Alignment >= MinimumAlignment;
 }
 
+int32 GetQualityResolution(EGeometryStampQuality Quality, int32 CustomResolution)
+{
+    switch (Quality)
+    {
+    case EGeometryStampQuality::Draft: return 16;
+    case EGeometryStampQuality::Preview: return 64;
+    case EGeometryStampQuality::High: return 128;
+    case EGeometryStampQuality::Bake: return 256;
+    default: return CustomResolution;
+    }
+}
+
 bool IsTriangleSurfaceAngleAllowed(
     const FVector& TraceDirection,
     const FVector& A,
@@ -207,6 +219,8 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FGeometryStampStaticMeshBakeTest::RunTest(const FString& Parameters)
 {
+    TestEqual(TEXT("Bake quality uses 256 subdivisions"), GetQualityResolution(EGeometryStampQuality::Bake, 32), 256);
+
     FDynamicMesh3 TestMesh(true, true, true, false);
     const int32 V0 = TestMesh.AppendVertex(FVector3d(0.0, 0.0, 0.0));
     const int32 V1 = TestMesh.AppendVertex(FVector3d(100.0, 0.0, 0.0));
@@ -643,24 +657,7 @@ void AGeometryStampActor::UpdateQualityFromResolution()
 
 void AGeometryStampActor::ApplyQualityResolution()
 {
-    switch (QualityPreset)
-    {
-    case EGeometryStampQuality::Draft:
-        GridResolution = 16;
-        break;
-    case EGeometryStampQuality::Preview:
-        GridResolution = 64;
-        break;
-    case EGeometryStampQuality::High:
-        GridResolution = 128;
-        break;
-    case EGeometryStampQuality::Bake:
-        GridResolution = 256;
-        break;
-    case EGeometryStampQuality::Custom:
-    default:
-        break;
-    }
+    GridResolution = GetQualityResolution(QualityPreset, GridResolution);
 }
 
 void AGeometryStampActor::RebuildStamp()
@@ -713,6 +710,7 @@ bool AGeometryStampActor::HasBakeableMesh() const
 bool AGeometryStampActor::BakeToStaticMesh(
     const FString& AssetFolder,
     const FString& AssetName,
+    EGeometryStampQuality BakeQuality,
     bool bEnableNanite,
     bool bReplaceActor,
     FText& OutError)
@@ -768,11 +766,9 @@ bool AGeometryStampActor::BakeToStaticMesh(
         *CleanAssetName,
         RF_Public | RF_Standalone | RF_Transactional);
 
-    bool bBuilt = false;
-    PreviewMesh->ProcessMesh([this, StaticMesh, bEnableNanite, &bBuilt](const FDynamicMesh3& Mesh)
-    {
-        bBuilt = BuildStaticMeshFromDynamicMesh(*StaticMesh, Mesh, PreviewMaterial, bEnableNanite);
-    });
+    FDynamicMesh3 BakeMesh(true, true, true, false);
+    BuildProjectedMesh(BakeMesh, GetQualityResolution(BakeQuality, GridResolution));
+    const bool bBuilt = BuildStaticMeshFromDynamicMesh(*StaticMesh, BakeMesh, PreviewMaterial, bEnableNanite);
 
     if (!bBuilt)
     {

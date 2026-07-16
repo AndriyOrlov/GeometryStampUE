@@ -34,6 +34,8 @@
 - [x] Asset naming and destination dialog
 - [x] Undo/redo transaction for optional actor replacement
 - [x] Existing-asset overwrite protection
+- [x] Independent Draft, Preview, High and Bake output quality
+- [x] Installed Crater, Rock Shelf and Ground Patch preset assets
 - [ ] Mesh reduction and generated LOD controls
 
 ## 0.6.0 — Production workflow

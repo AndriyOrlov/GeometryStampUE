@@ -67,6 +67,7 @@ public:
     bool BakeToStaticMesh(
         const FString& AssetFolder,
         const FString& AssetName,
+        EGeometryStampQuality BakeQuality,
         bool bEnableNanite,
         bool bReplaceActor,
         FText& OutError);
@@ -80,7 +81,9 @@ protected:
         EditAnywhere,
         BlueprintReadWrite,
         Category = "Geometry Stamp",
-        meta = (ToolTip = "Reusable scene-independent stamp settings. Apply Preset copies the asset values to this actor."))
+        meta = (
+            ForceShowPluginContent,
+            ToolTip = "Reusable scene-independent stamp settings. Apply Preset copies the asset values to this actor."))
     TObjectPtr<UGeometryStampPreset> Preset;
 
     UPROPERTY(

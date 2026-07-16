@@ -9,6 +9,7 @@
 #include "ObjectTools.h"
 #include "Widgets/Input/SCheckBox.h"
 #include "Widgets/Input/SButton.h"
+#include "Widgets/Input/SComboBox.h"
 #include "Widgets/Input/SEditableTextBox.h"
 #include "Widgets/SBoxPanel.h"
 #include "Widgets/SWindow.h"
@@ -28,6 +29,13 @@ public:
     void Construct(const FArguments& InArgs)
     {
         StampActor = InArgs._StampActor;
+        QualityOptions = {
+            MakeShared<EGeometryStampQuality>(EGeometryStampQuality::Draft),
+            MakeShared<EGeometryStampQuality>(EGeometryStampQuality::Preview),
+            MakeShared<EGeometryStampQuality>(EGeometryStampQuality::High),
+            MakeShared<EGeometryStampQuality>(EGeometryStampQuality::Bake)
+        };
+        SelectedQuality = QualityOptions.Last();
         const FString DefaultName = StampActor.IsValid()
             ? TEXT("SM_") + ObjectTools::SanitizeObjectName(StampActor->GetActorLabel())
             : TEXT("SM_GeometryStamp");
@@ -65,6 +73,33 @@ public:
                 .Text(FText::FromString(DefaultName))
                 .SelectAllTextWhenFocused(true)
                 .ToolTipText(LOCTEXT("BakeNameTooltip", "A new Static Mesh asset name. Existing assets are never overwritten."))
+            ]
+            + SVerticalBox::Slot()
+            .AutoHeight()
+            .Padding(12.0f, 4.0f)
+            [
+                SNew(STextBlock)
+                .Text(LOCTEXT("BakeQualityLabel", "Bake Quality"))
+            ]
+            + SVerticalBox::Slot()
+            .AutoHeight()
+            .Padding(12.0f, 0.0f, 12.0f, 8.0f)
+            [
+                SNew(SComboBox<TSharedPtr<EGeometryStampQuality>>)
+                .OptionsSource(&QualityOptions)
+                .InitiallySelectedItem(SelectedQuality)
+                .OnSelectionChanged_Lambda([this](TSharedPtr<EGeometryStampQuality> Quality, ESelectInfo::Type)
+                {
+                    SelectedQuality = Quality;
+                })
+                .OnGenerateWidget_Lambda([](TSharedPtr<EGeometryStampQuality> Quality)
+                {
+                    return SNew(STextBlock).Text(GetQualityText(*Quality));
+                })
+                [
+                    SNew(STextBlock)
+                    .Text_Lambda([this]() { return GetQualityText(*SelectedQuality); })
+                ]
             ]
             + SVerticalBox::Slot()
             .AutoHeight()
@@ -129,6 +164,7 @@ private:
         const bool bSucceeded = Actor->BakeToStaticMesh(
             FolderTextBox->GetText().ToString(),
             NameTextBox->GetText().ToString(),
+            *SelectedQuality,
             NaniteCheckBox->IsChecked(),
             ReplaceActorCheckBox->IsChecked(),
             Error);
@@ -139,6 +175,11 @@ private:
         }
 
         return CloseWindow();
+    }
+
+    static FText GetQualityText(EGeometryStampQuality Quality)
+    {
+        return StaticEnum<EGeometryStampQuality>()->GetDisplayNameTextByValue(static_cast<int64>(Quality));
     }
 
     FReply CloseWindow()
@@ -153,6 +194,8 @@ private:
     TWeakObjectPtr<AGeometryStampActor> StampActor;
     TSharedPtr<SEditableTextBox> FolderTextBox;
     TSharedPtr<SEditableTextBox> NameTextBox;
+    TArray<TSharedPtr<EGeometryStampQuality>> QualityOptions;
+    TSharedPtr<EGeometryStampQuality> SelectedQuality;
     TSharedPtr<SCheckBox> NaniteCheckBox;
     TSharedPtr<SCheckBox> ReplaceActorCheckBox;
 };
@@ -353,7 +396,7 @@ FReply FGeometryStampActorDetails::OpenBakeWindow()
 
     const TSharedRef<SWindow> Window = SNew(SWindow)
         .Title(LOCTEXT("BakeWindowTitle", "Bake Geometry Stamp"))
-        .ClientSize(FVector2D(460.0f, 270.0f))
+        .ClientSize(FVector2D(460.0f, 330.0f))
         .SupportsMinimize(false)
         .SupportsMaximize(false)
         [
