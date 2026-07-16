@@ -9,7 +9,7 @@ The project is an independent clean-room implementation based on the general
 workflow of terrain geometry stamping. It does not contain source code or assets
 from third-party marketplace products.
 
-## Current milestone: 0.4.2 presets and artist workflow
+## Current milestone: 0.4.3 presets and artist workflow
 
 - Placeable `GeometryStampActor`.
 - Circle and square footprints; the circle uses a full rounded-square quad grid.

@@ -112,6 +112,19 @@ bool IsSurfaceAngleAllowed(const FVector& TraceDirection, const FVector& ImpactN
         : FMath::Cos(FMath::DegreesToRadians(MaxAngle));
     return Alignment >= MinimumAlignment;
 }
+
+bool IsTriangleSurfaceAngleAllowed(
+    const FVector& TraceDirection,
+    const FVector& A,
+    const FVector& B,
+    const FVector& C,
+    double MaxAngleDegrees)
+{
+    const FVector TriangleNormal = FVector::CrossProduct(B - A, C - A).GetSafeNormal();
+    return !TriangleNormal.IsNearlyZero()
+        && (IsSurfaceAngleAllowed(TraceDirection, TriangleNormal, MaxAngleDegrees)
+            || IsSurfaceAngleAllowed(TraceDirection, -TriangleNormal, MaxAngleDegrees));
+}
 }
 
 #if WITH_DEV_AUTOMATION_TESTS
@@ -125,6 +138,10 @@ bool FGeometryStampSurfaceAngleTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("Horizontal surfaces are accepted"), IsSurfaceAngleAllowed(FVector::DownVector, FVector::UpVector, 85.0));
     TestFalse(TEXT("Vertical surfaces are rejected at 85 degrees"), IsSurfaceAngleAllowed(FVector::DownVector, FVector::ForwardVector, 85.0));
     TestTrue(TEXT("Ninety degrees allows vertical surfaces"), IsSurfaceAngleAllowed(FVector::DownVector, FVector::ForwardVector, 90.0));
+    TestTrue(TEXT("Flat generated triangles are accepted"), IsTriangleSurfaceAngleAllowed(
+        FVector::DownVector, FVector::ZeroVector, FVector::ForwardVector, FVector::RightVector, 85.0));
+    TestFalse(TEXT("Vertical generated triangles are rejected"), IsTriangleSurfaceAngleAllowed(
+        FVector::DownVector, FVector::ZeroVector, FVector::UpVector, FVector::RightVector, 85.0));
     return true;
 }
 #endif
@@ -607,6 +624,8 @@ void AGeometryStampActor::BuildProjectedMesh(FDynamicMesh3& Mesh, int32 Requeste
 
     TArray<int32> VertexIDs;
     VertexIDs.Init(INDEX_NONE, VerticesPerSide * VerticesPerSide);
+    TArray<FVector> WorldPositions;
+    WorldPositions.Init(FVector::ZeroVector, VerticesPerSide * VerticesPerSide);
 
     FGeometryStampHeightSampler HeightSampler;
     HeightSampler.Initialize(HeightTexture, HeightChannel);
@@ -663,7 +682,9 @@ void AGeometryStampActor::BuildProjectedMesh(FDynamicMesh3& Mesh, int32 Requeste
             Mesh.SetVertexUV(VertexID, FVector2f(
                 static_cast<float>(LocalPlanePosition.X / UVSize),
                 static_cast<float>(LocalPlanePosition.Y / UVSize)));
-            VertexIDs[Y * VerticesPerSide + X] = VertexID;
+            const int32 GridIndex = Y * VerticesPerSide + X;
+            VertexIDs[GridIndex] = VertexID;
+            WorldPositions[GridIndex] = WorldVertexPosition;
         }
     }
 
@@ -681,8 +702,24 @@ void AGeometryStampActor::BuildProjectedMesh(FDynamicMesh3& Mesh, int32 Requeste
                 continue;
             }
 
-            Mesh.AppendTriangle(V00, V11, V10);
-            Mesh.AppendTriangle(V00, V01, V11);
+            if (IsTriangleSurfaceAngleAllowed(
+                    TraceDirection,
+                    WorldPositions[Y * VerticesPerSide + X],
+                    WorldPositions[(Y + 1) * VerticesPerSide + X + 1],
+                    WorldPositions[Y * VerticesPerSide + X + 1],
+                    MaxSurfaceAngle))
+            {
+                Mesh.AppendTriangle(V00, V11, V10);
+            }
+            if (IsTriangleSurfaceAngleAllowed(
+                    TraceDirection,
+                    WorldPositions[Y * VerticesPerSide + X],
+                    WorldPositions[(Y + 1) * VerticesPerSide + X],
+                    WorldPositions[(Y + 1) * VerticesPerSide + X + 1],
+                    MaxSurfaceAngle))
+            {
+                Mesh.AppendTriangle(V00, V01, V11);
+            }
         }
     }
 
