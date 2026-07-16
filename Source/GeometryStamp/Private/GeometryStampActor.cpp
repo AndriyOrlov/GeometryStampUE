@@ -645,8 +645,8 @@ void AGeometryStampActor::BuildProjectedMesh(FDynamicMesh3& Mesh, int32 Requeste
                 continue;
             }
 
-            Mesh.AppendTriangle(V00, V10, V11);
-            Mesh.AppendTriangle(V00, V11, V01);
+            Mesh.AppendTriangle(V00, V11, V10);
+            Mesh.AppendTriangle(V00, V01, V11);
         }
     }
 
