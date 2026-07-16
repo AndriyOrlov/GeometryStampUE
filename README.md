@@ -9,24 +9,28 @@ The project is an independent clean-room implementation based on the general
 workflow of terrain geometry stamping. It does not contain source code or assets
 from third-party marketplace products.
 
-## Current milestone: 0.3.0 stabilization
+## Current milestone: 0.4.0 presets and artist workflow
 
 - Placeable `GeometryStampActor`.
-- Circle and rectangle footprints.
+- Circle and square footprints; the circle uses a full rounded-square quad grid.
 - Adjustable grid resolution and physical size.
 - Projection along world down or the actor's local down axis.
 - Landscape and Static Mesh support through collision traces.
 - G8 and BGRA8 heightmap displacement.
 - Height channel, center, magnitude and additive offset controls.
 - Smooth geometric edge falloff.
+- Adjustable edge inset for a clean transition into the projected surface.
 - Automatic editor preview rebuild.
 - Lightweight, throttled preview while moving the actor.
 - Full-resolution rebuild after the actor is released.
 - Optional preview material and world-sized UVs.
 - Dedicated **Place Actors → Geometry Stamp** drag-and-drop item.
+- Reusable `GeometryStampPreset` Data Assets with Apply, Save As and Reset actions.
+- Draft (16), Preview (64), High (128) and Bake (256) geometry quality presets.
+- Material texture auto-detection with Displacement → Height → generated luminance fallback.
 
-Stamp presets are the next milestone. Static Mesh/Nanite baking, batch operations
-and PCG integration are planned for later milestones.
+Static Mesh/Nanite baking, batch operations and PCG integration are planned for
+later milestones.
 
 ## Installation
 
@@ -49,6 +53,15 @@ Target: Unreal Engine 5.6.1 on Windows.
 4. Adjust `Displacement Strength`, `Height Center`, `Edge Falloff` and `Mask Hardness`.
 5. Use `Rebuild Stamp` if automatic rebuild is disabled.
 
+Assigning `Material` automatically looks for a texture parameter or texture asset
+named like Displacement, Height, Bump or Parallax. If none exists, the best
+available material texture is sampled as luminance height data. The source texture
+asset is never modified. Use `Auto from Material` to run the same detection again.
+
+Use `Save Current as Preset` to create a new preset asset. It always opens a Save
+As dialog and never overwrites the selected preset. `Apply Preset` copies only
+stamp settings; actor transform and scene actor references are not stored.
+
 `Displacement Strength` is intentionally independent from actor height. Moving
 the actor changes the stamp location and projection direction without changing
 the sculpted result. During movement, `Move Preview Resolution` is used for a
@@ -60,5 +73,5 @@ iteration and reserve high resolution for the future bake workflow.
 ## Status
 
 The editor module builds against Unreal Engine 5.6.1 on Windows. Editor startup,
-Place Actors registration, native actor creation and Dynamic Mesh projection onto
-a collision-enabled Static Mesh have been smoke-tested.
+Place Actors registration, preset Save/Apply, quality switching, Undo/Redo and
+Dynamic Mesh projection onto collision-enabled geometry have been smoke-tested.

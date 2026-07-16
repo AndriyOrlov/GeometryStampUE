@@ -19,9 +19,11 @@ public class GeometryStamp : ModuleRules
         PrivateDependencyModuleNames.AddRange(
             new[]
             {
+                "AssetTools",
                 "AssetRegistry",
                 "PlacementMode",
                 "PropertyEditor",
+                "Slate",
                 "SlateCore",
                 "UnrealEd"
             });

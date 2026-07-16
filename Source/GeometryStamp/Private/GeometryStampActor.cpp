@@ -1,12 +1,19 @@
 #include "GeometryStampActor.h"
 
+#include "GeometryStampPreset.h"
+
+#include "AssetToolsModule.h"
 #include "HAL/PlatformTime.h"
 #include "Components/DynamicMeshComponent.h"
 #include "DynamicMesh/DynamicMesh3.h"
 #include "DynamicMesh/MeshNormals.h"
 #include "UDynamicMesh.h"
 #include "Engine/Texture2D.h"
+#include "Factories/DataAssetFactory.h"
 #include "Materials/MaterialInterface.h"
+#include "Misc/PackageName.h"
+#include "Modules/ModuleManager.h"
+#include "ScopedTransaction.h"
 
 using UE::Geometry::FDynamicMesh3;
 using UE::Geometry::FMeshNormals;
@@ -127,6 +134,20 @@ void AGeometryStampActor::PostEditChangeProperty(FPropertyChangedEvent& Property
 {
     Super::PostEditChangeProperty(PropertyChangedEvent);
 
+    const FName PropertyName = PropertyChangedEvent.GetPropertyName();
+    if (PropertyName == GET_MEMBER_NAME_CHECKED(AGeometryStampActor, QualityPreset))
+    {
+        ApplyQualityResolution();
+    }
+    else if (PropertyName == GET_MEMBER_NAME_CHECKED(AGeometryStampActor, GridResolution))
+    {
+        UpdateQualityFromResolution();
+    }
+    else if (PropertyName == GET_MEMBER_NAME_CHECKED(AGeometryStampActor, PreviewMaterial))
+    {
+        AutoConfigureHeightFromMaterial();
+    }
+
     if (bAutoRebuild && !bIsRebuilding)
     {
         RebuildStamp();
@@ -162,7 +183,354 @@ void AGeometryStampActor::PostEditMove(bool bFinished)
     LastMovePreviewTime = CurrentTime;
     RebuildStampInternal(MovePreviewResolution);
 }
+
+void AGeometryStampActor::PostEditUndo()
+{
+    Super::PostEditUndo();
+    UpdateQualityFromResolution();
+    RebuildStamp();
+}
 #endif
+
+void AGeometryStampActor::ApplyPreset()
+{
+    if (!Preset)
+    {
+        return;
+    }
+
+    const FScopedTransaction Transaction(NSLOCTEXT("GeometryStamp", "ApplyPreset", "Apply Geometry Stamp Preset"));
+    Modify();
+    CopySettingsFromPreset(*Preset);
+    UpdateQualityFromResolution();
+    RebuildStamp();
+}
+
+void AGeometryStampActor::SaveCurrentAsPreset()
+{
+#if WITH_EDITOR
+    IAssetTools& AssetTools = FModuleManager::LoadModuleChecked<FAssetToolsModule>(TEXT("AssetTools")).Get();
+
+    FString UniquePackageName;
+    FString UniqueAssetName;
+    AssetTools.CreateUniqueAssetName(
+        TEXT("/Game/GeometryStamp/Presets/GS_Preset"),
+        TEXT(""),
+        UniquePackageName,
+        UniqueAssetName);
+
+    UDataAssetFactory* Factory = NewObject<UDataAssetFactory>();
+    Factory->DataAssetClass = UGeometryStampPreset::StaticClass();
+
+    UObject* CreatedAsset = AssetTools.CreateAssetWithDialog(
+        UniqueAssetName,
+        FPackageName::GetLongPackagePath(UniquePackageName),
+        UGeometryStampPreset::StaticClass(),
+        Factory,
+        TEXT("GeometryStamp.SavePreset"),
+        false);
+
+    UGeometryStampPreset* NewPreset = Cast<UGeometryStampPreset>(CreatedAsset);
+    if (!NewPreset)
+    {
+        return;
+    }
+
+    const FScopedTransaction Transaction(NSLOCTEXT("GeometryStamp", "SavePreset", "Save Geometry Stamp Preset"));
+    Modify();
+    NewPreset->SetFlags(RF_Transactional);
+    NewPreset->Modify();
+    CopySettingsToPreset(*NewPreset);
+    NewPreset->MarkPackageDirty();
+    Preset = NewPreset;
+#endif
+}
+
+void AGeometryStampActor::ResetToDefaults()
+{
+    const AGeometryStampActor* Defaults = GetClass()->GetDefaultObject<AGeometryStampActor>();
+    if (!Defaults)
+    {
+        return;
+    }
+
+    const FScopedTransaction Transaction(NSLOCTEXT("GeometryStamp", "ResetDefaults", "Reset Geometry Stamp to Defaults"));
+    Modify();
+    Preset = nullptr;
+    ResetSettingsFrom(*Defaults);
+    RebuildStamp();
+}
+
+void AGeometryStampActor::AutoConfigureFromMaterial()
+{
+    if (!PreviewMaterial)
+    {
+        return;
+    }
+
+    const FScopedTransaction Transaction(NSLOCTEXT("GeometryStamp", "AutoMaterial", "Auto Configure Geometry Stamp from Material"));
+    Modify();
+    if (AutoConfigureHeightFromMaterial())
+    {
+        RebuildStamp();
+    }
+}
+
+bool AGeometryStampActor::AutoConfigureHeightFromMaterial()
+{
+    if (!PreviewMaterial)
+    {
+        const bool bChanged = HeightTexture != nullptr;
+        HeightTexture = nullptr;
+        return bChanged;
+    }
+
+    struct FHeightCandidate
+    {
+        TObjectPtr<UTexture2D> Texture;
+        EGeometryStampHeightChannel Channel = EGeometryStampHeightChannel::Luminance;
+        int32 Score = MIN_int32;
+    };
+
+    FHeightCandidate BestCandidate;
+    TSet<UTexture2D*> SeenTextures;
+
+    const auto ScoreName = [](const FString& LowerName, bool& bOutExplicitHeight)
+    {
+        bOutExplicitHeight = true;
+        if (LowerName.Contains(TEXT("displacement")) || LowerName.Contains(TEXT("_disp")))
+        {
+            return 10000;
+        }
+        if (LowerName.Contains(TEXT("height")))
+        {
+            return 9000;
+        }
+        if (LowerName.Contains(TEXT("bump")) || LowerName.Contains(TEXT("parallax")))
+        {
+            return 8000;
+        }
+
+        bOutExplicitHeight = false;
+        if (LowerName.Contains(TEXT("rough")))
+        {
+            return 600;
+        }
+        if (LowerName.Contains(TEXT("ambientocclusion")) || LowerName.Contains(TEXT("_ao")))
+        {
+            return 550;
+        }
+        if (LowerName.Contains(TEXT("basecolor")) || LowerName.Contains(TEXT("albedo")) || LowerName.Contains(TEXT("diffuse")))
+        {
+            return 500;
+        }
+        if (LowerName.Contains(TEXT("normal")))
+        {
+            return 100;
+        }
+        return 10;
+    };
+
+    const auto ConsiderTexture = [&BestCandidate, &SeenTextures, &ScoreName](UTexture* Texture, const FString& SourceName)
+    {
+        UTexture2D* Texture2D = Cast<UTexture2D>(Texture);
+        if (!Texture2D || SeenTextures.Contains(Texture2D) || !Texture2D->Source.IsValid())
+        {
+            return;
+        }
+
+        const ETextureSourceFormat SourceFormat = Texture2D->Source.GetFormat();
+        if (SourceFormat != TSF_G8 && SourceFormat != TSF_BGRA8)
+        {
+            return;
+        }
+
+        SeenTextures.Add(Texture2D);
+        const FString LowerName = (SourceName + TEXT("_") + Texture2D->GetName()).ToLower();
+        bool bExplicitHeight = false;
+        const int32 Score = ScoreName(LowerName, bExplicitHeight);
+        if (Score <= BestCandidate.Score)
+        {
+            return;
+        }
+
+        EGeometryStampHeightChannel Channel = bExplicitHeight
+            ? EGeometryStampHeightChannel::Red
+            : EGeometryStampHeightChannel::Luminance;
+        if (bExplicitHeight && (LowerName.Contains(TEXT("alpha")) || LowerName.EndsWith(TEXT("_a"))))
+        {
+            Channel = EGeometryStampHeightChannel::Alpha;
+        }
+        else if (bExplicitHeight && LowerName.EndsWith(TEXT("_g")))
+        {
+            Channel = EGeometryStampHeightChannel::Green;
+        }
+        else if (bExplicitHeight && LowerName.EndsWith(TEXT("_b")))
+        {
+            Channel = EGeometryStampHeightChannel::Blue;
+        }
+
+        BestCandidate.Texture = Texture2D;
+        BestCandidate.Channel = Channel;
+        BestCandidate.Score = Score;
+    };
+
+    TArray<FMaterialParameterInfo> ParameterInfos;
+    TArray<FGuid> ParameterIds;
+    PreviewMaterial->GetAllTextureParameterInfo(ParameterInfos, ParameterIds);
+    for (const FMaterialParameterInfo& ParameterInfo : ParameterInfos)
+    {
+        UTexture* Texture = nullptr;
+        if (PreviewMaterial->GetTextureParameterValue(ParameterInfo, Texture))
+        {
+            ConsiderTexture(Texture, ParameterInfo.Name.ToString());
+        }
+    }
+
+    TArray<UTexture*> UsedTextures;
+    PreviewMaterial->GetUsedTextures(
+        UsedTextures,
+        EMaterialQualityLevel::High,
+        true,
+        ERHIFeatureLevel::SM5,
+        true);
+    for (UTexture* Texture : UsedTextures)
+    {
+        ConsiderTexture(Texture, Texture ? Texture->GetName() : FString());
+    }
+
+    if (!BestCandidate.Texture)
+    {
+        const bool bChanged = HeightTexture != nullptr;
+        HeightTexture = nullptr;
+        return bChanged;
+    }
+
+    const bool bChanged = HeightTexture != BestCandidate.Texture || HeightChannel != BestCandidate.Channel;
+    HeightTexture = BestCandidate.Texture;
+    HeightChannel = BestCandidate.Channel;
+    return bChanged;
+}
+
+void AGeometryStampActor::CopySettingsFromPreset(const UGeometryStampPreset& SourcePreset)
+{
+    PreviewMaterial = SourcePreset.Material;
+    HeightTexture = SourcePreset.HeightTexture;
+    HeightChannel = SourcePreset.HeightChannel;
+    Shape = SourcePreset.Shape;
+    Size = SourcePreset.Size;
+    GridResolution = SourcePreset.GridResolution;
+    Projection = SourcePreset.ProjectionMode;
+    TraceDistance = SourcePreset.TraceDistance;
+    bTraceComplex = SourcePreset.bTraceComplex;
+    HeightCenter = SourcePreset.HeightCenter;
+    HeightMagnitude = SourcePreset.DisplacementStrength;
+    HeightAdd = SourcePreset.SurfaceOffset;
+    EdgeInset = SourcePreset.EdgeInset;
+    EdgeFalloff = SourcePreset.EdgeFalloff;
+    MaskHardness = SourcePreset.MaskHardness;
+    HeightTiling = SourcePreset.HeightTiling;
+    UVSize = SourcePreset.UVSize;
+    bAutoRebuild = SourcePreset.bAutoRebuild;
+    bLightweightMovePreview = SourcePreset.bLightweightMovePreview;
+    MovePreviewResolution = SourcePreset.MovePreviewResolution;
+    MovePreviewUpdateInterval = SourcePreset.MovePreviewUpdateInterval;
+}
+
+void AGeometryStampActor::CopySettingsToPreset(UGeometryStampPreset& TargetPreset) const
+{
+    TargetPreset.Material = PreviewMaterial;
+    TargetPreset.HeightTexture = HeightTexture;
+    TargetPreset.HeightChannel = HeightChannel;
+    TargetPreset.Shape = Shape;
+    TargetPreset.Size = Size;
+    TargetPreset.GridResolution = GridResolution;
+    TargetPreset.ProjectionMode = Projection;
+    TargetPreset.TraceDistance = TraceDistance;
+    TargetPreset.bTraceComplex = bTraceComplex;
+    TargetPreset.HeightCenter = HeightCenter;
+    TargetPreset.DisplacementStrength = HeightMagnitude;
+    TargetPreset.SurfaceOffset = HeightAdd;
+    TargetPreset.EdgeInset = EdgeInset;
+    TargetPreset.EdgeFalloff = EdgeFalloff;
+    TargetPreset.MaskHardness = MaskHardness;
+    TargetPreset.HeightTiling = HeightTiling;
+    TargetPreset.UVSize = UVSize;
+    TargetPreset.bAutoRebuild = bAutoRebuild;
+    TargetPreset.bLightweightMovePreview = bLightweightMovePreview;
+    TargetPreset.MovePreviewResolution = MovePreviewResolution;
+    TargetPreset.MovePreviewUpdateInterval = MovePreviewUpdateInterval;
+}
+
+void AGeometryStampActor::ResetSettingsFrom(const AGeometryStampActor& Defaults)
+{
+    QualityPreset = Defaults.QualityPreset;
+    GridResolution = Defaults.GridResolution;
+    Shape = Defaults.Shape;
+    Size = Defaults.Size;
+    HeightTexture = Defaults.HeightTexture;
+    HeightChannel = Defaults.HeightChannel;
+    HeightCenter = Defaults.HeightCenter;
+    HeightMagnitude = Defaults.HeightMagnitude;
+    HeightAdd = Defaults.HeightAdd;
+    EdgeInset = Defaults.EdgeInset;
+    EdgeFalloff = Defaults.EdgeFalloff;
+    MaskHardness = Defaults.MaskHardness;
+    HeightTiling = Defaults.HeightTiling;
+    PreviewMaterial = Defaults.PreviewMaterial;
+    UVSize = Defaults.UVSize;
+    Projection = Defaults.Projection;
+    bAutoRebuild = Defaults.bAutoRebuild;
+    bLightweightMovePreview = Defaults.bLightweightMovePreview;
+    MovePreviewResolution = Defaults.MovePreviewResolution;
+    MovePreviewUpdateInterval = Defaults.MovePreviewUpdateInterval;
+    TraceDistance = Defaults.TraceDistance;
+    bTraceComplex = Defaults.bTraceComplex;
+}
+
+void AGeometryStampActor::UpdateQualityFromResolution()
+{
+    switch (GridResolution)
+    {
+    case 16:
+        QualityPreset = EGeometryStampQuality::Draft;
+        break;
+    case 64:
+        QualityPreset = EGeometryStampQuality::Preview;
+        break;
+    case 128:
+        QualityPreset = EGeometryStampQuality::High;
+        break;
+    case 256:
+        QualityPreset = EGeometryStampQuality::Bake;
+        break;
+    default:
+        QualityPreset = EGeometryStampQuality::Custom;
+        break;
+    }
+}
+
+void AGeometryStampActor::ApplyQualityResolution()
+{
+    switch (QualityPreset)
+    {
+    case EGeometryStampQuality::Draft:
+        GridResolution = 16;
+        break;
+    case EGeometryStampQuality::Preview:
+        GridResolution = 64;
+        break;
+    case EGeometryStampQuality::High:
+        GridResolution = 128;
+        break;
+    case EGeometryStampQuality::Bake:
+        GridResolution = 256;
+        break;
+    case EGeometryStampQuality::Custom:
+    default:
+        break;
+    }
+}
 
 void AGeometryStampActor::RebuildStamp()
 {
@@ -224,15 +592,11 @@ void AGeometryStampActor::BuildProjectedMesh(FDynamicMesh3& Mesh, int32 Requeste
                 static_cast<double>(Y) / Resolution);
             const FVector2D NormalizedPosition = UV * 2.0 - FVector2D(1.0, 1.0);
             const float ShapeDistance = CalculateShapeDistance(NormalizedPosition);
-
-            if (ShapeDistance > 1.0f)
-            {
-                continue;
-            }
+            const FVector2D ShapePosition = MapShapePosition(NormalizedPosition);
 
             const FVector LocalPlanePosition(
-                NormalizedPosition.X * Size.X * 0.5,
-                NormalizedPosition.Y * Size.Y * 0.5,
+                ShapePosition.X * Size.X * 0.5,
+                ShapePosition.Y * Size.Y * 0.5,
                 0.0);
             const FVector WorldPlanePosition = ActorTransform.TransformPosition(LocalPlanePosition);
             const FVector TraceStart = WorldPlanePosition - TraceDirection * TraceDistance;
@@ -254,7 +618,8 @@ void AGeometryStampActor::BuildProjectedMesh(FDynamicMesh3& Mesh, int32 Requeste
 
             const float EdgeMask = CalculateEdgeMask(ShapeDistance);
             const double Displacement =
-                ((static_cast<double>(HeightValue) - HeightCenter) * HeightMagnitude + HeightAdd) * EdgeMask;
+                ((static_cast<double>(HeightValue) - HeightCenter) * HeightMagnitude + HeightAdd) * EdgeMask
+                - EdgeInset * (1.0 - EdgeMask);
             const FVector WorldVertexPosition = Hit.ImpactPoint + Hit.ImpactNormal * Displacement;
             const FVector LocalVertexPosition = ActorTransform.InverseTransformPosition(WorldVertexPosition);
 
@@ -291,14 +656,25 @@ void AGeometryStampActor::BuildProjectedMesh(FDynamicMesh3& Mesh, int32 Requeste
     }
 }
 
-float AGeometryStampActor::CalculateShapeDistance(const FVector2D& NormalizedPosition) const
+FVector2D AGeometryStampActor::MapShapePosition(const FVector2D& NormalizedPosition) const
 {
     if (Shape == EGeometryStampShape::Rectangle)
     {
-        return static_cast<float>(FMath::Max(FMath::Abs(NormalizedPosition.X), FMath::Abs(NormalizedPosition.Y)));
+        return NormalizedPosition;
     }
 
-    return static_cast<float>(NormalizedPosition.Size());
+    // Elliptical square-to-disc mapping keeps the complete quad grid while
+    // turning the square boundary into a smooth circle/ellipse.
+    const double XSquared = FMath::Square(NormalizedPosition.X);
+    const double YSquared = FMath::Square(NormalizedPosition.Y);
+    return FVector2D(
+        NormalizedPosition.X * FMath::Sqrt(FMath::Max(0.0, 1.0 - YSquared * 0.5)),
+        NormalizedPosition.Y * FMath::Sqrt(FMath::Max(0.0, 1.0 - XSquared * 0.5)));
+}
+
+float AGeometryStampActor::CalculateShapeDistance(const FVector2D& NormalizedPosition) const
+{
+    return static_cast<float>(FMath::Max(FMath::Abs(NormalizedPosition.X), FMath::Abs(NormalizedPosition.Y)));
 }
 
 float AGeometryStampActor::CalculateEdgeMask(float ShapeDistance) const

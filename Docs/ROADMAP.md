@@ -5,7 +5,8 @@
 - [x] Dynamic Mesh grid generation
 - [x] Landscape/mesh trace projection
 - [x] Height texture sampling
-- [x] Circle and rectangle masks
+- [x] Full-grid rounded circle and square shapes
+- [x] Edge inset into the projected surface
 - [x] Live editor rebuilding
 - [x] Lightweight move preview and full-quality release rebuild
 - [x] Details Panel category prioritization
@@ -17,10 +18,11 @@
 
 ## 0.4.0 — Preset workflow
 
-- [ ] `UGeometryStampPreset` Data Asset
-- [ ] Apply, save-as and reset actions with Undo/Redo
-- [ ] Draft, Preview, High and Bake quality presets
-- [ ] Artist-oriented Details Panel ordering
+- [x] `UGeometryStampPreset` Data Asset
+- [x] Apply, save-as and reset actions with Undo/Redo
+- [x] Draft, Preview, High and Bake quality presets
+- [x] Artist-oriented Details Panel ordering
+- [x] Material map auto-detection and luminance fallback
 
 ## 0.5.0 — Bakeable MVP
 
