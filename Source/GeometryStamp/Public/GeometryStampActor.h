@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Curves/CurveFloat.h"
 #include "GameFramework/Actor.h"
 #include "GeometryStampTypes.h"
 #include "GeometryStampActor.generated.h"
@@ -160,6 +161,17 @@ protected:
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Geometry Stamp|Height / Displacement", meta = (ClampMin = "0.01", UIMin = "0.1", UIMax = "8.0"))
     FVector2D HeightTiling = FVector2D(1.0, 1.0);
+
+    UPROPERTY(
+        EditAnywhere,
+        BlueprintReadWrite,
+        Category = "Geometry Stamp|Height / Displacement",
+        meta = (
+            DisplayName = "Height Profile",
+            XAxisName = "Input Height",
+            YAxisName = "Output Height",
+            ToolTip = "Remaps sampled height from 0..1 to 0..1 before displacement. The default curve is linear from (0,0) to (1,1)."))
+    FRuntimeFloatCurve HeightProfile;
 
     UPROPERTY(
         EditAnywhere,

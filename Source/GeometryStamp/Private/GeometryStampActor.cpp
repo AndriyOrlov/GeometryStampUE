@@ -135,6 +135,15 @@ int32 GetQualityResolution(EGeometryStampQuality Quality, int32 CustomResolution
     }
 }
 
+float EvaluateHeightProfile(const FRuntimeFloatCurve& Profile, float HeightValue)
+{
+    const float Input = FMath::Clamp(HeightValue, 0.0f, 1.0f);
+    const FRichCurve* Curve = Profile.GetRichCurveConst();
+    return Curve && Curve->GetNumKeys() > 0
+        ? FMath::Clamp(Curve->Eval(Input, Input), 0.0f, 1.0f)
+        : Input;
+}
+
 bool IsTriangleSurfaceAngleAllowed(
     const FVector& TraceDirection,
     const FVector& A,
@@ -209,6 +218,11 @@ bool FGeometryStampSurfaceAngleTest::RunTest(const FString& Parameters)
         FVector::DownVector, FVector::ZeroVector, FVector::ForwardVector, FVector::RightVector, 85.0));
     TestFalse(TEXT("Vertical generated triangles are rejected"), IsTriangleSurfaceAngleAllowed(
         FVector::DownVector, FVector::ZeroVector, FVector::UpVector, FVector::RightVector, 85.0));
+
+    FRuntimeFloatCurve HeightProfile;
+    HeightProfile.EditorCurveData.AddKey(0.0f, 0.0f);
+    HeightProfile.EditorCurveData.AddKey(1.0f, 0.5f);
+    TestEqual(TEXT("Height profile remaps normalized height"), EvaluateHeightProfile(HeightProfile, 1.0f), 0.5f);
     return true;
 }
 
@@ -259,6 +273,9 @@ AGeometryStampActor::AGeometryStampActor()
     PreviewMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
     PreviewMesh->SetGenerateOverlapEvents(false);
     PreviewMesh->SetCastShadow(true);
+
+    HeightProfile.EditorCurveData.AddKey(0.0f, 0.0f);
+    HeightProfile.EditorCurveData.AddKey(1.0f, 1.0f);
 }
 
 void AGeometryStampActor::OnConstruction(const FTransform& Transform)
@@ -573,6 +590,7 @@ void AGeometryStampActor::CopySettingsFromPreset(const UGeometryStampPreset& Sou
     EdgeFalloff = SourcePreset.EdgeFalloff;
     MaskHardness = SourcePreset.MaskHardness;
     HeightTiling = SourcePreset.HeightTiling;
+    HeightProfile = SourcePreset.HeightProfile;
     UVSize = SourcePreset.UVSize;
     bAutoRebuild = SourcePreset.bAutoRebuild;
     bLightweightMovePreview = SourcePreset.bLightweightMovePreview;
@@ -599,6 +617,7 @@ void AGeometryStampActor::CopySettingsToPreset(UGeometryStampPreset& TargetPrese
     TargetPreset.EdgeFalloff = EdgeFalloff;
     TargetPreset.MaskHardness = MaskHardness;
     TargetPreset.HeightTiling = HeightTiling;
+    TargetPreset.HeightProfile = HeightProfile;
     TargetPreset.UVSize = UVSize;
     TargetPreset.bAutoRebuild = bAutoRebuild;
     TargetPreset.bLightweightMovePreview = bLightweightMovePreview;
@@ -621,6 +640,7 @@ void AGeometryStampActor::ResetSettingsFrom(const AGeometryStampActor& Defaults)
     EdgeFalloff = Defaults.EdgeFalloff;
     MaskHardness = Defaults.MaskHardness;
     HeightTiling = Defaults.HeightTiling;
+    HeightProfile = Defaults.HeightProfile;
     PreviewMaterial = Defaults.PreviewMaterial;
     UVSize = Defaults.UVSize;
     Projection = Defaults.Projection;
@@ -877,6 +897,7 @@ void AGeometryStampActor::BuildProjectedMesh(FDynamicMesh3& Mesh, int32 Requeste
 
             float HeightValue = HeightCenter;
             HeightSampler.Sample(UV, HeightTiling, HeightValue);
+            HeightValue = EvaluateHeightProfile(HeightProfile, HeightValue);
 
             const float EdgeMask = CalculateEdgeMask(ShapeDistance);
             const double Displacement =

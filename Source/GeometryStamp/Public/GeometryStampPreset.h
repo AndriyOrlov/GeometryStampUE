@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Curves/CurveFloat.h"
 #include "Engine/DataAsset.h"
 #include "GeometryStampTypes.h"
 #include "GeometryStampPreset.generated.h"
@@ -15,6 +16,8 @@ class GEOMETRYSTAMP_API UGeometryStampPreset : public UDataAsset
     GENERATED_BODY()
 
 public:
+    UGeometryStampPreset();
+
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Material / UV")
     TObjectPtr<UMaterialInterface> Material;
 
@@ -65,6 +68,17 @@ public:
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Height / Displacement", meta = (ClampMin = "0.01"))
     FVector2D HeightTiling = FVector2D(1.0, 1.0);
+
+    UPROPERTY(
+        EditAnywhere,
+        BlueprintReadOnly,
+        Category = "Height / Displacement",
+        meta = (
+            DisplayName = "Height Profile",
+            XAxisName = "Input Height",
+            YAxisName = "Output Height",
+            ToolTip = "Remaps sampled height from 0..1 to 0..1 before displacement."))
+    FRuntimeFloatCurve HeightProfile;
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Material / UV", meta = (ClampMin = "0.01", Units = "cm"))
     double UVSize = 100.0;

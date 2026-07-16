@@ -9,7 +9,7 @@ The project is an independent clean-room implementation based on the general
 workflow of terrain geometry stamping. It does not contain source code or assets
 from third-party marketplace products.
 
-## Current milestone: 0.5.1 bakeable MVP
+## Current milestone: 0.5.2 bakeable MVP
 
 - Placeable `GeometryStampActor`.
 - Circle and square footprints; the circle uses a full rounded-square quad grid.
@@ -36,6 +36,7 @@ from third-party marketplace products.
 - Bake assets are always created as new assets and never silently overwritten.
 - Bake quality can be selected independently: Draft 16, Preview 64, High 128 or Bake 256.
 - Crater, Rock Shelf and Ground Patch presets are included in Plugin Content.
+- Inline **Height Profile** curve remaps sampled height from normalized input `0..1` to output `0..1` before displacement.
 
 Mesh reduction, generated LODs, batch operations and PCG integration are planned
 for later milestones.
