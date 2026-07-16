@@ -4,7 +4,7 @@
 #include "Components/DynamicMeshComponent.h"
 #include "DynamicMesh/DynamicMesh3.h"
 #include "DynamicMesh/MeshNormals.h"
-#include "DynamicMesh/UDynamicMesh.h"
+#include "UDynamicMesh.h"
 #include "Engine/Texture2D.h"
 #include "Materials/MaterialInterface.h"
 

@@ -5,6 +5,7 @@
 #include "ActorFactories/ActorFactoryClass.h"
 #include "AssetRegistry/AssetData.h"
 #include "IPlacementModeModule.h"
+#include "Misc/App.h"
 #include "Modules/ModuleManager.h"
 #include "PropertyEditorModule.h"
 
@@ -17,12 +18,22 @@ const FName GeometryStampPlacementCategory(TEXT("GeometryStamp"));
 
 void FGeometryStampModule::StartupModule()
 {
+    if (IsRunningCommandlet() || !FApp::CanEverRender())
+    {
+        return;
+    }
+
     RegisterDetailsCustomization();
     RegisterPlacementItems();
 }
 
 void FGeometryStampModule::ShutdownModule()
 {
+    if (IsRunningCommandlet() || !FApp::CanEverRender())
+    {
+        return;
+    }
+
     UnregisterPlacementItems();
     UnregisterDetailsCustomization();
 }

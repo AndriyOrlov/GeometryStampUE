@@ -9,7 +9,7 @@ The project is an independent clean-room implementation based on the general
 workflow of terrain geometry stamping. It does not contain source code or assets
 from third-party marketplace products.
 
-## Current milestone: 0.1 prototype
+## Current milestone: 0.3.0 stabilization
 
 - Placeable `GeometryStampActor`.
 - Circle and rectangle footprints.
@@ -25,8 +25,8 @@ from third-party marketplace products.
 - Optional preview material and world-sized UVs.
 - Dedicated **Place Actors → Geometry Stamp** drag-and-drop item.
 
-Static Mesh/Nanite baking, asset presets, batch operations and PCG integration
-are planned for later milestones.
+Stamp presets are the next milestone. Static Mesh/Nanite baking, batch operations
+and PCG integration are planned for later milestones.
 
 ## Installation
 
@@ -39,14 +39,14 @@ are planned for later milestones.
 The placed native actor is Blueprint-compatible. You can use it directly or
 create a Blueprint child when project-specific defaults and presets are needed.
 
-Target: Unreal Engine 5.6 and 5.7 on Windows.
+Target: Unreal Engine 5.6.1 on Windows.
 
 ## Basic use
 
 1. Place the actor above the target surface.
 2. Set `Size` and a moderate `Grid Resolution`, such as 32 or 64.
 3. Assign a source height texture. G8 or BGRA8 source formats are currently supported.
-4. Adjust `Height Magnitude`, `Height Center`, `Edge Falloff` and `Mask Hardness`.
+4. Adjust `Displacement Strength`, `Height Center`, `Edge Falloff` and `Mask Hardness`.
 5. Use `Rebuild Stamp` if automatic rebuild is disabled.
 
 `Displacement Strength` is intentionally independent from actor height. Moving
@@ -59,5 +59,6 @@ iteration and reserve high resolution for the future bake workflow.
 
 ## Status
 
-This is an early source prototype and has not yet been compiled against a local
-Unreal Engine installation in the current development environment.
+The editor module builds against Unreal Engine 5.6.1 on Windows. Editor startup,
+Place Actors registration, native actor creation and Dynamic Mesh projection onto
+a collision-enabled Static Mesh have been smoke-tested.

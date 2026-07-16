@@ -13,7 +13,7 @@
     {
       "Name": "GeometryStamp",
       "Type": "Editor",
-      "LoadingPhase": "Default"
+      "LoadingPhase": "PostEngineInit"
     }
   ],
   "Plugins": [
