@@ -9,7 +9,7 @@ The project is an independent clean-room implementation based on the general
 workflow of terrain geometry stamping. It does not contain source code or assets
 from third-party marketplace products.
 
-## Current milestone: 0.4.0 presets and artist workflow
+## Current milestone: 0.4.1 presets and artist workflow
 
 - Placeable `GeometryStampActor`.
 - Circle and square footprints; the circle uses a full rounded-square quad grid.
@@ -28,6 +28,8 @@ from third-party marketplace products.
 - Reusable `GeometryStampPreset` Data Assets with Apply, Save As and Reset actions.
 - Draft (16), Preview (64), High (128) and Bake (256) geometry quality presets.
 - Material texture auto-detection with Displacement → Height → generated luminance fallback.
+- Plugin-owned example stamps, editable materials and heightmaps.
+- Custom Geometry Stamp icon for Place Actors and Blueprint-derived classes.
 
 Static Mesh/Nanite baking, batch operations and PCG integration are planned for
 later milestones.
@@ -61,6 +63,19 @@ asset is never modified. Use `Auto from Material` to run the same detection agai
 Use `Save Current as Preset` to create a new preset asset. It always opens a Save
 As dialog and never overwrites the selected preset. `Apply Preset` copies only
 stamp settings; actor transform and scene actor references are not stored.
+
+## Ready-to-drag examples
+
+Open **Place Actors → Geometry Stamp** and drag one of these onto a Landscape or
+collision-enabled Static Mesh:
+
+- **Example — Crater** — circular impact with a raised rim and recessed center.
+- **Example — Rock Shelf** — rectangular layered rock breakup.
+- **Example — Ground Patch** — broad, soft organic ground variation.
+
+Their source assets are under **Plugin Content → Geometry Stamp → Examples**.
+`M_GS_Example` is an editable master material; its instances and clean-room G8
+heightmaps are included with the plugin.
 
 `Displacement Strength` is intentionally independent from actor height. Moving
 the actor changes the stamp location and projection direction without changing

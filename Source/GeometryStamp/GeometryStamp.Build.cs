@@ -23,6 +23,7 @@ public class GeometryStamp : ModuleRules
                 "AssetRegistry",
                 "PlacementMode",
                 "PropertyEditor",
+                "Projects",
                 "Slate",
                 "SlateCore",
                 "UnrealEd"

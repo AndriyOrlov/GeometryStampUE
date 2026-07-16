@@ -23,6 +23,8 @@
 - [x] Draft, Preview, High and Bake quality presets
 - [x] Artist-oriented Details Panel ordering
 - [x] Material map auto-detection and luminance fallback
+- [x] Ready-to-drag example Blueprints and editable example materials
+- [x] Custom plugin, actor and Blueprint-derived class icon
 
 ## 0.5.0 — Bakeable MVP
 
