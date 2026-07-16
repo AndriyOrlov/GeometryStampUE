@@ -11,6 +11,9 @@
 #include "Engine/Texture2D.h"
 #include "Factories/DataAssetFactory.h"
 #include "Materials/MaterialInterface.h"
+#if WITH_DEV_AUTOMATION_TESTS
+#include "Misc/AutomationTest.h"
+#endif
 #include "Misc/PackageName.h"
 #include "Modules/ModuleManager.h"
 #include "ScopedTransaction.h"
@@ -99,7 +102,32 @@ private:
     EGeometryStampHeightChannel Channel = EGeometryStampHeightChannel::Red;
     TArray64<uint8> Data;
 };
+
+bool IsSurfaceAngleAllowed(const FVector& TraceDirection, const FVector& ImpactNormal, double MaxAngleDegrees)
+{
+    const double MaxAngle = FMath::Clamp(MaxAngleDegrees, 0.0, 90.0);
+    const double Alignment = FVector::DotProduct((-TraceDirection).GetSafeNormal(), ImpactNormal.GetSafeNormal());
+    const double MinimumAlignment = MaxAngle >= 90.0
+        ? 0.0
+        : FMath::Cos(FMath::DegreesToRadians(MaxAngle));
+    return Alignment >= MinimumAlignment;
 }
+}
+
+#if WITH_DEV_AUTOMATION_TESTS
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FGeometryStampSurfaceAngleTest,
+    "GeometryStamp.Projection.SurfaceAngle",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FGeometryStampSurfaceAngleTest::RunTest(const FString& Parameters)
+{
+    TestTrue(TEXT("Horizontal surfaces are accepted"), IsSurfaceAngleAllowed(FVector::DownVector, FVector::UpVector, 85.0));
+    TestFalse(TEXT("Vertical surfaces are rejected at 85 degrees"), IsSurfaceAngleAllowed(FVector::DownVector, FVector::ForwardVector, 85.0));
+    TestTrue(TEXT("Ninety degrees allows vertical surfaces"), IsSurfaceAngleAllowed(FVector::DownVector, FVector::ForwardVector, 90.0));
+    return true;
+}
+#endif
 
 AGeometryStampActor::AGeometryStampActor()
 {
@@ -421,6 +449,7 @@ void AGeometryStampActor::CopySettingsFromPreset(const UGeometryStampPreset& Sou
     Size = SourcePreset.Size;
     GridResolution = SourcePreset.GridResolution;
     Projection = SourcePreset.ProjectionMode;
+    MaxSurfaceAngle = SourcePreset.MaxSurfaceAngle;
     TraceDistance = SourcePreset.TraceDistance;
     bTraceComplex = SourcePreset.bTraceComplex;
     HeightCenter = SourcePreset.HeightCenter;
@@ -446,6 +475,7 @@ void AGeometryStampActor::CopySettingsToPreset(UGeometryStampPreset& TargetPrese
     TargetPreset.Size = Size;
     TargetPreset.GridResolution = GridResolution;
     TargetPreset.ProjectionMode = Projection;
+    TargetPreset.MaxSurfaceAngle = MaxSurfaceAngle;
     TargetPreset.TraceDistance = TraceDistance;
     TargetPreset.bTraceComplex = bTraceComplex;
     TargetPreset.HeightCenter = HeightCenter;
@@ -480,6 +510,7 @@ void AGeometryStampActor::ResetSettingsFrom(const AGeometryStampActor& Defaults)
     PreviewMaterial = Defaults.PreviewMaterial;
     UVSize = Defaults.UVSize;
     Projection = Defaults.Projection;
+    MaxSurfaceAngle = Defaults.MaxSurfaceAngle;
     bAutoRebuild = Defaults.bAutoRebuild;
     bLightweightMovePreview = Defaults.bLightweightMovePreview;
     MovePreviewResolution = Defaults.MovePreviewResolution;
@@ -609,6 +640,11 @@ void AGeometryStampActor::BuildProjectedMesh(FDynamicMesh3& Mesh, int32 Requeste
                     TraceEnd,
                     ECC_Visibility,
                     QueryParams))
+            {
+                continue;
+            }
+
+            if (!IsSurfaceAngleAllowed(TraceDirection, Hit.ImpactNormal, MaxSurfaceAngle))
             {
                 continue;
             }

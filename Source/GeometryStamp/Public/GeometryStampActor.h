@@ -163,6 +163,20 @@ protected:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Geometry Stamp|Projection")
     EGeometryStampProjection Projection = EGeometryStampProjection::WorldDown;
 
+    UPROPERTY(
+        EditAnywhere,
+        BlueprintReadWrite,
+        Category = "Geometry Stamp|Projection",
+        meta = (
+            DisplayName = "Max Surface Angle",
+            ToolTip = "Reject projected geometry on surfaces steeper than this angle relative to the projection plane. Use 85 degrees to prevent spill onto walls.",
+            ClampMin = "0.0",
+            ClampMax = "90.0",
+            UIMin = "0.0",
+            UIMax = "90.0",
+            Units = "deg"))
+    double MaxSurfaceAngle = 85.0;
+
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Geometry Stamp|Preview")
     bool bAutoRebuild = true;
 

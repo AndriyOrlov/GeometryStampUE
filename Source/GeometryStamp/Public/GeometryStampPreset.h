@@ -36,6 +36,9 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Projection")
     EGeometryStampProjection ProjectionMode = EGeometryStampProjection::WorldDown;
 
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Projection", meta = (ClampMin = "0.0", ClampMax = "90.0", Units = "deg"))
+    double MaxSurfaceAngle = 85.0;
+
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Projection", meta = (ClampMin = "1.0", Units = "cm"))
     double TraceDistance = 100000.0;
 
