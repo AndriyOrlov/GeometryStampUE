@@ -21,6 +21,8 @@ public class GeometryStamp : ModuleRules
             {
                 "AssetTools",
                 "AssetRegistry",
+                "MeshConversion",
+                "MeshDescription",
                 "PlacementMode",
                 "PropertyEditor",
                 "Projects",

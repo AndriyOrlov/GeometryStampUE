@@ -3,20 +3,30 @@
 #include "GeometryStampPreset.h"
 
 #include "AssetToolsModule.h"
+#include "AssetRegistry/AssetRegistryModule.h"
 #include "HAL/PlatformTime.h"
 #include "Components/DynamicMeshComponent.h"
 #include "DynamicMesh/DynamicMesh3.h"
 #include "DynamicMesh/MeshNormals.h"
+#include "DynamicMeshToMeshDescription.h"
 #include "UDynamicMesh.h"
+#include "Editor.h"
+#include "Engine/StaticMesh.h"
+#include "Engine/StaticMeshActor.h"
 #include "Engine/Texture2D.h"
 #include "Factories/DataAssetFactory.h"
+#include "Materials/Material.h"
 #include "Materials/MaterialInterface.h"
+#include "MeshDescription.h"
 #if WITH_DEV_AUTOMATION_TESTS
 #include "Misc/AutomationTest.h"
 #endif
 #include "Misc/PackageName.h"
 #include "Modules/ModuleManager.h"
+#include "ObjectTools.h"
+#include "PhysicsEngine/BodySetup.h"
 #include "ScopedTransaction.h"
+#include "UObject/Package.h"
 
 using UE::Geometry::FDynamicMesh3;
 using UE::Geometry::FMeshNormals;
@@ -125,6 +135,51 @@ bool IsTriangleSurfaceAngleAllowed(
         && (IsSurfaceAngleAllowed(TraceDirection, TriangleNormal, MaxAngleDegrees)
             || IsSurfaceAngleAllowed(TraceDirection, -TriangleNormal, MaxAngleDegrees));
 }
+
+bool BuildStaticMeshFromDynamicMesh(
+    UStaticMesh& StaticMesh,
+    const FDynamicMesh3& DynamicMesh,
+    UMaterialInterface* Material,
+    bool bEnableNanite)
+{
+    if (DynamicMesh.TriangleCount() == 0)
+    {
+        return false;
+    }
+
+    StaticMesh.SetNumSourceModels(1);
+    FMeshBuildSettings& BuildSettings = StaticMesh.GetSourceModel(0).BuildSettings;
+    BuildSettings.bRecomputeNormals = false;
+    BuildSettings.bRecomputeTangents = true;
+    BuildSettings.bGenerateLightmapUVs = false;
+    BuildSettings.bUseFullPrecisionUVs = true;
+
+    StaticMesh.CreateMeshDescription(0);
+    FMeshDescription* MeshDescription = StaticMesh.GetMeshDescription(0);
+    if (!MeshDescription)
+    {
+        return false;
+    }
+
+    FDynamicMeshToMeshDescription Converter;
+    Converter.Convert(&DynamicMesh, *MeshDescription, false);
+    StaticMesh.CommitMeshDescription(0);
+
+    FStaticMaterial StaticMaterial;
+    StaticMaterial.MaterialInterface = Material ? Material : UMaterial::GetDefaultMaterial(MD_Surface);
+    StaticMaterial.MaterialSlotName = TEXT("GeometryStampMaterial");
+    StaticMaterial.ImportedMaterialSlotName = StaticMaterial.MaterialSlotName;
+    StaticMaterial.UVChannelData = FMeshUVChannelInfo(1.0f);
+    StaticMesh.GetStaticMaterials().Reset();
+    StaticMesh.GetStaticMaterials().Add(StaticMaterial);
+
+    StaticMesh.NaniteSettings.bEnabled = bEnableNanite;
+    StaticMesh.CreateBodySetup();
+    StaticMesh.GetBodySetup()->CollisionTraceFlag = CTF_UseComplexAsSimple;
+    StaticMesh.MarkPackageDirty();
+    StaticMesh.PostEditChange();
+    return true;
+}
 }
 
 #if WITH_DEV_AUTOMATION_TESTS
@@ -142,6 +197,34 @@ bool FGeometryStampSurfaceAngleTest::RunTest(const FString& Parameters)
         FVector::DownVector, FVector::ZeroVector, FVector::ForwardVector, FVector::RightVector, 85.0));
     TestFalse(TEXT("Vertical generated triangles are rejected"), IsTriangleSurfaceAngleAllowed(
         FVector::DownVector, FVector::ZeroVector, FVector::UpVector, FVector::RightVector, 85.0));
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FGeometryStampStaticMeshBakeTest,
+    "GeometryStamp.Bake.StaticMeshConversion",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FGeometryStampStaticMeshBakeTest::RunTest(const FString& Parameters)
+{
+    FDynamicMesh3 TestMesh(true, true, true, false);
+    const int32 V0 = TestMesh.AppendVertex(FVector3d(0.0, 0.0, 0.0));
+    const int32 V1 = TestMesh.AppendVertex(FVector3d(100.0, 0.0, 0.0));
+    const int32 V2 = TestMesh.AppendVertex(FVector3d(0.0, 100.0, 0.0));
+    TestMesh.SetVertexUV(V0, FVector2f(0.0f, 0.0f));
+    TestMesh.SetVertexUV(V1, FVector2f(1.0f, 0.0f));
+    TestMesh.SetVertexUV(V2, FVector2f(0.0f, 1.0f));
+    TestMesh.AppendTriangle(V0, V2, V1);
+    FMeshNormals::QuickComputeVertexNormals(TestMesh, false);
+
+    UStaticMesh* StaticMesh = NewObject<UStaticMesh>(GetTransientPackage());
+    TestTrue(TEXT("Dynamic mesh converts to a static mesh"), BuildStaticMeshFromDynamicMesh(*StaticMesh, TestMesh, nullptr, true));
+    TestTrue(TEXT("Nanite option is preserved"), StaticMesh->NaniteSettings.bEnabled);
+    TestNotNull(TEXT("LOD0 mesh description exists"), StaticMesh->GetMeshDescription(0));
+    if (const FMeshDescription* MeshDescription = StaticMesh->GetMeshDescription(0))
+    {
+        TestEqual(TEXT("LOD0 triangle count"), MeshDescription->Triangles().Num(), 1);
+    }
     return true;
 }
 #endif
@@ -612,6 +695,134 @@ void AGeometryStampActor::ClearStamp()
     PreviewMesh->GetDynamicMesh()->Reset();
     PreviewMesh->NotifyMeshUpdated();
 }
+
+#if WITH_EDITOR
+bool AGeometryStampActor::HasBakeableMesh() const
+{
+    bool bHasTriangles = false;
+    if (PreviewMesh)
+    {
+        PreviewMesh->ProcessMesh([&bHasTriangles](const FDynamicMesh3& Mesh)
+        {
+            bHasTriangles = Mesh.TriangleCount() > 0;
+        });
+    }
+    return bHasTriangles;
+}
+
+bool AGeometryStampActor::BakeToStaticMesh(
+    const FString& AssetFolder,
+    const FString& AssetName,
+    bool bEnableNanite,
+    bool bReplaceActor,
+    FText& OutError)
+{
+    OutError = FText::GetEmpty();
+
+    FString CleanFolder = AssetFolder.TrimStartAndEnd().Replace(TEXT("\\"), TEXT("/"));
+    while (CleanFolder.EndsWith(TEXT("/")))
+    {
+        CleanFolder.LeftChopInline(1);
+    }
+
+    const FString CleanAssetName = ObjectTools::SanitizeObjectName(AssetName.TrimStartAndEnd());
+    if (CleanFolder.IsEmpty() || CleanAssetName.IsEmpty())
+    {
+        OutError = NSLOCTEXT("GeometryStamp", "BakeMissingPath", "Enter both an asset folder and asset name.");
+        return false;
+    }
+
+    const FString PackageName = CleanFolder / CleanAssetName;
+    FText PackageError;
+    if (!FPackageName::IsValidLongPackageName(PackageName, false, &PackageError))
+    {
+        OutError = FText::Format(
+            NSLOCTEXT("GeometryStamp", "BakeInvalidPath", "Invalid asset path: {0}"),
+            PackageError);
+        return false;
+    }
+
+    if (!PackageName.StartsWith(TEXT("/Game/")))
+    {
+        OutError = NSLOCTEXT("GeometryStamp", "BakeOutsideGame", "Bake assets must be created inside /Game.");
+        return false;
+    }
+
+    if (FPackageName::DoesPackageExist(PackageName) || FindPackage(nullptr, *PackageName))
+    {
+        OutError = FText::Format(
+            NSLOCTEXT("GeometryStamp", "BakeAssetExists", "{0} already exists. Choose a new name; Geometry Stamp never overwrites bake assets."),
+            FText::FromString(PackageName));
+        return false;
+    }
+
+    if (!HasBakeableMesh())
+    {
+        OutError = NSLOCTEXT("GeometryStamp", "BakeEmptyMesh", "The stamp preview is empty. Rebuild the stamp before baking.");
+        return false;
+    }
+
+    UPackage* Package = CreatePackage(*PackageName);
+    UStaticMesh* StaticMesh = NewObject<UStaticMesh>(
+        Package,
+        *CleanAssetName,
+        RF_Public | RF_Standalone | RF_Transactional);
+
+    bool bBuilt = false;
+    PreviewMesh->ProcessMesh([this, StaticMesh, bEnableNanite, &bBuilt](const FDynamicMesh3& Mesh)
+    {
+        bBuilt = BuildStaticMeshFromDynamicMesh(*StaticMesh, Mesh, PreviewMaterial, bEnableNanite);
+    });
+
+    if (!bBuilt)
+    {
+        OutError = NSLOCTEXT("GeometryStamp", "BakeConversionFailed", "Could not convert the preview mesh to a Static Mesh.");
+        return false;
+    }
+
+    FAssetRegistryModule::AssetCreated(StaticMesh);
+    Package->MarkPackageDirty();
+
+    if (bReplaceActor)
+    {
+        UWorld* World = GetWorld();
+        if (!World)
+        {
+            OutError = NSLOCTEXT("GeometryStamp", "BakeMissingWorld", "The stamp is not placed in an editor world.");
+            return false;
+        }
+
+        const FScopedTransaction Transaction(NSLOCTEXT("GeometryStamp", "BakeReplaceActor", "Replace Geometry Stamp with Static Mesh"));
+        FActorSpawnParameters SpawnParameters;
+        SpawnParameters.OverrideLevel = GetLevel();
+        SpawnParameters.ObjectFlags |= RF_Transactional;
+
+        AStaticMeshActor* BakedActor = World->SpawnActor<AStaticMeshActor>(
+            AStaticMeshActor::StaticClass(),
+            GetActorTransform(),
+            SpawnParameters);
+        if (!BakedActor)
+        {
+            OutError = NSLOCTEXT("GeometryStamp", "BakeSpawnFailed", "The asset was created, but the Static Mesh Actor could not be placed.");
+            return false;
+        }
+
+        BakedActor->SetActorLabel(GetActorLabel() + TEXT("_Baked"));
+        BakedActor->GetStaticMeshComponent()->SetMobility(EComponentMobility::Static);
+        BakedActor->GetStaticMeshComponent()->SetStaticMesh(StaticMesh);
+
+        Modify();
+        World->EditorDestroyActor(this, true);
+        GEditor->SelectNone(false, true, false);
+        GEditor->SelectActor(BakedActor, true, true);
+    }
+
+    TArray<UObject*> ObjectsToSync;
+    ObjectsToSync.Add(StaticMesh);
+    GEditor->SyncBrowserToObjects(ObjectsToSync);
+    return true;
+}
+#endif
 
 void AGeometryStampActor::BuildProjectedMesh(FDynamicMesh3& Mesh, int32 RequestedResolution)
 {

@@ -9,7 +9,7 @@ The project is an independent clean-room implementation based on the general
 workflow of terrain geometry stamping. It does not contain source code or assets
 from third-party marketplace products.
 
-## Current milestone: 0.4.3 presets and artist workflow
+## Current milestone: 0.5.0 bakeable MVP
 
 - Placeable `GeometryStampActor`.
 - Circle and square footprints; the circle uses a full rounded-square quad grid.
@@ -31,9 +31,12 @@ from third-party marketplace products.
 - Material texture auto-detection with Displacement → Height → generated luminance fallback.
 - Plugin-owned example stamps, editable materials and heightmaps.
 - Custom Geometry Stamp icon for Place Actors and Blueprint-derived classes.
+- **Bake to Static Mesh** window with destination folder and asset name.
+- Optional Nanite enablement and replacement with a Static Mesh Actor.
+- Bake assets are always created as new assets and never silently overwritten.
 
-Static Mesh/Nanite baking, batch operations and PCG integration are planned for
-later milestones.
+Mesh reduction, generated LODs, batch operations and PCG integration are planned
+for later milestones.
 
 ## Installation
 
@@ -64,6 +67,12 @@ asset is never modified. Use `Auto from Material` to run the same detection agai
 Use `Save Current as Preset` to create a new preset asset. It always opens a Save
 As dialog and never overwrites the selected preset. `Apply Preset` copies only
 stamp settings; actor transform and scene actor references are not stored.
+
+To bake, select one stamp and click `Bake to Static Mesh...` at the top of its
+Details panel. Choose a `/Game` folder and a new asset name, then enable Nanite
+and actor replacement as needed. The baked asset keeps the projected geometry,
+material and UVs. Save the new asset when prompted by Unreal Editor. Undo restores
+the preview actor when replacement was enabled; it does not delete the new asset.
 
 ## Ready-to-drag examples
 

@@ -17,8 +17,8 @@ namespace UE::Geometry
 
 /**
  * Editor-only geometry stamp that creates a projected Dynamic Mesh preview.
- * The generated mesh is never intended to ship directly; a later milestone
- * converts the preview to a Nanite-ready Static Mesh asset.
+ * The generated mesh is an editable preview that can be baked to a
+ * Nanite-ready Static Mesh asset from the Details panel.
  */
 UCLASS(
     BlueprintType,
@@ -61,6 +61,16 @@ public:
     void ClearStamp();
 
     bool HasPreset() const { return Preset != nullptr; }
+
+#if WITH_EDITOR
+    bool HasBakeableMesh() const;
+    bool BakeToStaticMesh(
+        const FString& AssetFolder,
+        const FString& AssetName,
+        bool bEnableNanite,
+        bool bReplaceActor,
+        FText& OutError);
+#endif
 
 protected:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Geometry Stamp")

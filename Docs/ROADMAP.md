@@ -28,11 +28,13 @@
 
 ## 0.5.0 — Bakeable MVP
 
-- [ ] Bake selected stamps to Static Mesh assets
-- [ ] Nanite build settings
+- [x] Bake selected stamps to Static Mesh assets
+- [x] Nanite build settings
 - [ ] Normals, tangents and material UV validation
-- [ ] Asset naming and destination dialog
-- [ ] Undo/redo transactions
+- [x] Asset naming and destination dialog
+- [x] Undo/redo transaction for optional actor replacement
+- [x] Existing-asset overwrite protection
+- [ ] Mesh reduction and generated LOD controls
 
 ## 0.6.0 — Production workflow
 

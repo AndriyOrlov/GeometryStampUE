@@ -20,6 +20,8 @@ private:
     FReply AutoConfigureFromMaterial();
     FReply RebuildStamp();
     FReply ClearStamp();
+    FReply OpenBakeWindow();
     bool CanApplyPreset() const;
     bool CanSavePreset() const;
+    bool CanBake() const;
 };
